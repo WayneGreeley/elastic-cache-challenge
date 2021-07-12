@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Sample SAM app to test postgres with redis
+
+Globals:
+  Function:
+    Timeout: 9
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+      Events:
+        HelloWorld:
+          Type: Api 
+          Properties:
+            Path: /helloworld
+            Method: get
+  HelloRedisFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: redis-app.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+        - AmazonElastiCacheFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-<id change this>
+        SubnetIds:
+          - subnet-<id change this>
+      Events:
+        HelloWorld:
+          Type: Api 
+          Properties:
+            Path: /helloredis
+            Method: get
+
+Outputs:
+
+  HelloWorldApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloworld"
+  HelloWRedisApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloredis"
