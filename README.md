@@ -9,3 +9,53 @@
 - **Configure HTTP Server**
 
   If you are running the application on your workstation, you can access it at http://127.0.0.1:5000.  Alternately, you can configure an HTTP server listening on the public interface as a proxy.  I've provided such a configuration for the nginx http server in [`config/nginx-app.conf`](https://raw.githubusercontent.com/ACloudGuru/elastic-cache-challenge/master/config/nginx-app.conf).
+
+
+
+
+
+
+
+
+
+
+
+
+aws  --region us-east-1 ec2 describe-vpcs
+
+
+aws ec2 describe-subnets --query "Subnets[?AvailabilityZone=='us-east-1a'].SubnetId"
+
+
+aws cloudformation create-stack --stack-name postgres-example --template-body file://template.yaml
+
+
+aws ec2 describe-security-groups --query "SecurityGroups[?Description=='cache'].GroupId"
+
+
+
+
+sudo yum install postgresql
+
+psql \
+   --host=webapp-db.<id change this>.us-east-1.rds.amazonaws.com \
+   --port=5432 \
+   --username=postgres \
+   --password \
+   --dbname=postgres
+
+
+create function slow_version() RETURNS text AS
+            $$
+              select pg_sleep(5);
+              select version();
+            $$
+            LANGUAGE SQL;
+
+
+
+
+
+
+
+
