@@ -18,7 +18,7 @@
 
 
 
-
+```
 
 
 aws  --region us-east-1 ec2 describe-vpcs
@@ -27,8 +27,7 @@ aws  --region us-east-1 ec2 describe-vpcs
 aws ec2 describe-subnets --query "Subnets[?AvailabilityZone=='us-east-1a'].SubnetId"
 
 
-aws cloudformation create-stack --stack-name postgres-example --template-body file://template.yaml
-
+aws cloudformation create-stack --stack-name postgres-example --template-body file://template.yaml --capabilities CAPABILITY_AUTO_EXPAND
 
 aws ec2 describe-security-groups --query "SecurityGroups[?Description=='cache'].GroupId"
 
@@ -54,8 +53,10 @@ create function slow_version() RETURNS text AS
 
 
 
+sam build
+
+sam deploy -g
 
 
 
-
-
+```
