@@ -22,30 +22,6 @@ def config(filename='database.ini', section='postgresql'):
     print(db)
     return db
 
-def build():
-    print('build...')
-    try:
-        # connect to database 
-        conn = connect()
-        cur = conn.cursor()
-        sqlCommand = """
-            create function slow_version() RETURNS text AS
-            $$
-              select pg_sleep(5);
-              select version();
-            $$
-            LANGUAGE SQL;
-        """
-        cur.execute(sqlCommand)
-        print('Closing connection to build database...')
-        cur.close() 
-        conn.close()
-    
-        return 0
-        
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
-
 def fetch(sql):
     print('fetch...')
     ttl = 10 # Time to live in seconds
@@ -58,7 +34,7 @@ def fetch(sql):
 
         if result:
             print('cache match ')
-            return result
+            return result.decode('utf-8')
         else:
             # connect to database listed in database.ini
             conn = connect()
@@ -71,7 +47,7 @@ def fetch(sql):
             conn.close()
 
         # cache result
-        cache.setex(sql, ttl, ''.join(result))
+        cache.set(sql, ("".join(result)).encode('utf_8'), ex=ttl)
         return result
         
     except (Exception, psycopg2.DatabaseError) as error:
@@ -99,17 +75,17 @@ def connect():
 def lambda_handler(event, context):
     
     # build()
-    retval = ''
     sql = 'SELECT slow_version();'
     db_result = fetch(sql)
     print('db_result:',db_result)
     
-    retval = 'DB Version = ' + ''.join(db_result)
+    retval = 'DB Version = ' 
+    if db_result:
+        retval = retval + ''.join(db_result)
 
     return {
         "statusCode": 200,
         "body": json.dumps({
             "message": retval,
-            # "location": ip.text.replace("\n", "")
         }),
     }
