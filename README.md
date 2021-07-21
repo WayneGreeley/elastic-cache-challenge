@@ -75,7 +75,6 @@ sam build
 sam deploy -g
 ```
 
-For SAM guided options, I choose...
 
 
 Test the application using the outputs from the SAM deploy.
@@ -85,9 +84,9 @@ The cache time-to-live for redis is set to 10 secounds, so the first helloredis 
 For the next ten seconds, the helloredis test will take under one second.
 
 
+![cache miss](/img/api-no-cache.png "cache miss")
 
-
-
+![cache hit](/img/api-yes-cache.png "cache hit")
 
 
 
