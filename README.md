@@ -22,7 +22,7 @@ The template.yaml in the root of this project allows CloudFormation to provision
 
 Update VpcId in template.yaml with the default VPC id found by...
 ```
-aws --region us-east-1 ec2 describe-vpcs
+aws --region us-east-1 ec2 describe-vpcs --query "Vpcs[?isDefault==true].VpcId"
 ```
 
 Update SubnetIds in template.yaml with subnet id for us-east-1a subnet of the default VPC found by...
