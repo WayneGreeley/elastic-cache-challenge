@@ -32,7 +32,7 @@ aws ec2 describe-subnets --query "Subnets[?AvailabilityZone=='us-east-1a'].Subne
 
 Deploy the CloudFormation template...
 ```
-aws cloudformation create-stack --stack-name postgres-example --template-body file://template.yaml --capabilities CAPABILITY_AUTO_EXPAND
+aws cloudformation create-stack --stack-name postgres-example --template-body file://template.yaml --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_IAM
 ```
 
 When the CloudFormation stack is successfully deployed...

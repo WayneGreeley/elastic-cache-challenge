@@ -20,6 +20,91 @@ Parameters:
 
 Resources:
 
+  EC2LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  GetDefaultVpcFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          def lambda_handler(event, context):
+            try:
+              ec = boto3.client('ec2')
+              response = ec.describe_vpcs(
+                Filters=[{
+                  'Name': 'isDefault',
+                  'Values': ['true',]
+                },]
+              )
+              defaultId = response['Vpcs'][0]['VpcId']
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"defaultId":defaultId})
+            except (Exception) as error:
+              print(error)
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.lambda_handler
+      Runtime: "python3.7"
+      Timeout: '10'
+      Role: !GetAtt EC2LambdaRole.Arn
+
+  GetFirstSubnetFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          def lambda_handler(event, context):
+            try:
+              ec = boto3.client('ec2')
+              response = ec.describe_subnets(
+                Filters=[{
+                  'Name': 'vpc-id',
+                  'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
+                },]
+              )
+              firstSubnet = response['Subnets'][0]
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"az":firstSubnet['AvailabilityZone'], "subId":firstSubnet['SubnetId']})
+            except (Exception) as error:
+              print(error)
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.lambda_handler
+      Runtime: "python3.7"
+      Timeout: '10'
+      Role: !GetAtt EC2LambdaRole.Arn
+
+  GetDefaultVpc:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt GetDefaultVpcFunction.Arn
+      Environment:
+        Variables:
+          Region: !Ref "AWS::Region"
+
+  GetFirstSubnet:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt GetFirstSubnetFunction.Arn
+      Environment:
+        Variables:
+          vpcid: !GetAtt GetDefaultVpc.defaultId
+
   WebAppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -74,7 +159,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: cache
-      VpcId: vpc-<id change this>
+      VpcId: !GetAtt GetDefaultVpc.defaultId
   CacheSecurityGroupIngress:
     Type: 'AWS::EC2::SecurityGroupIngress'
     Properties:
@@ -98,7 +183,7 @@ Resources:
     Properties:
       Description: cache
       SubnetIds:
-      - subnet-<id change this>
+      - !GetAtt GetFirstSubnet.subId
 
 Outputs:
 
