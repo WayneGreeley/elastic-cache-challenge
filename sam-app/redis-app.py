@@ -2,21 +2,36 @@ import json
 import psycopg2
 from configparser import ConfigParser
 import redis
+import os
+
+# [postgresql]
+# host=webapp-db.<id change this>.us-east-1.rds.amazonaws.com 
+# database=postgres
+# user=postgres
+# password=postgres
+# port=5432
+# [redis]
+# redis_url=redis://db-ca-<id change this>.use1.cache.amazonaws.com:6379
+
+
+        #   DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+        #   DB_Username: !Ref DBUsername
+        #   DB_Password: !Ref DBPassword
+        #   DB_Type: 'postgres'
+        #   DB_Port: '5432'
+        #   REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
 
 def config(filename='database.ini', section='postgresql'):
-    # create a parser
-    parser = ConfigParser()
-    # read config file
-    parser.read(filename)
+    
+    print("dbhost = " + os.environ['DB_Host'])
 
     # get section, default to postgresql
     db = {}
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            db[param[0]] = param[1]
-    else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+    db['host'] = os.environ['DB_Host']
+    db['database'] = os.environ['DB_Type']
+    db['user'] = os.environ['DB_Username']
+    db['password'] = os.environ['DB_Password']
+    db['port'] = os.environ['DB_Port']
 
     print('database configged')
     print(db)
@@ -28,7 +43,7 @@ def fetch(sql):
     try:
         params = config(section='redis')
         print('cache?...')
-        cache = redis.Redis.from_url(params['redis_url'])
+        cache = redis.Redis.from_url('redis://' + os.environ['REDIS_URL'] +':6379')
         result = cache.get(sql)
         print('cache found')
 
