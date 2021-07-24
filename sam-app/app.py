@@ -1,49 +1,23 @@
 import json
 import psycopg2
-from configparser import ConfigParser
+import os
 
-def config(filename='database.ini', section='postgresql'):
-    # create a parser
-    parser = ConfigParser()
-    # read config file
-    parser.read(filename)
+def config():
+    
+    print("dbhost = " + os.environ['DB_Host'])
 
     # get section, default to postgresql
     db = {}
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            db[param[0]] = param[1]
-    else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+    db['host'] = os.environ['DB_Host']
+    db['database'] = os.environ['DB_Type']
+    db['user'] = os.environ['DB_Username']
+    db['password'] = os.environ['DB_Password']
+    db['port'] = os.environ['DB_Port']
 
     print('database configged')
     print(db)
     return db
 
-def build():
-    print('build...')
-    try:
-        # connect to database 
-        conn = connect()
-        cur = conn.cursor()
-        sqlCommand = """
-            create function slow_version() RETURNS text AS
-            $$
-              select pg_sleep(5);
-              select version();
-            $$
-            LANGUAGE SQL;
-        """
-        cur.execute(sqlCommand)
-        print('Closing connection to build database...')
-        cur.close() 
-        conn.close()
-    
-        return 0
-        
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
 
 def fetch(sql):
     print('fetch...')
@@ -84,12 +58,13 @@ def connect():
 
 def lambda_handler(event, context):
     
-    # build()
-    retval = ''
     sql = 'SELECT slow_version();'
     db_result = fetch(sql)
+    print('db_result:',db_result)
     
-    retval = 'DB Version = ' + ''.join(db_result)
+    retval = 'DB Version = ' 
+    if db_result:
+        retval = retval + ''.join(db_result)
 
     return {
         "statusCode": 200,

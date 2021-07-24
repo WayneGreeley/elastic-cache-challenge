@@ -201,6 +201,13 @@ Resources:
           Properties:
             Path: /helloworld
             Method: get
+      Environment:
+        Variables:
+          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+          DB_Username: !Ref DBUsername
+          DB_Password: !Ref DBPassword
+          DB_Type: 'postgres'
+          DB_Port: '5432'
   HelloRedisFunction:
     Type: AWS::Serverless::Function 
     Properties:
@@ -230,6 +237,33 @@ Resources:
           DB_Type: 'postgres'
           DB_Port: '5432'
           REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
+          
+  BuildProcedureFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: build-sp.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt DBEC2SecurityGroup.GroupId
+        SubnetIds:
+          - !GetAtt GetFirstSubnet.subId
+      Environment:
+        Variables:
+          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+          DB_Username: !Ref DBUsername
+          DB_Password: !Ref DBPassword
+          DB_Type: 'postgres'
+          DB_Port: '5432'
+
+  RunBuildProcedure:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt BuildProcedureFunction.Arn
 
 Outputs:
 
@@ -239,9 +273,6 @@ Outputs:
   RedisEndpoint:
     Description: 'Connection endpoint for the cache'
     Value: !GetAtt Cache.RedisEndpoint.Address
-  RedisSite:
-    Description: 'Connection url for the cache'
-    Value: "redis://{Cache.RedisEndpoint.Address}:6379"
 
   HelloWorldApi:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"

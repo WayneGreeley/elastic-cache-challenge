@@ -1,27 +1,9 @@
 import json
 import psycopg2
-from configparser import ConfigParser
 import redis
 import os
 
-# [postgresql]
-# host=webapp-db.<id change this>.us-east-1.rds.amazonaws.com 
-# database=postgres
-# user=postgres
-# password=postgres
-# port=5432
-# [redis]
-# redis_url=redis://db-ca-<id change this>.use1.cache.amazonaws.com:6379
-
-
-        #   DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-        #   DB_Username: !Ref DBUsername
-        #   DB_Password: !Ref DBPassword
-        #   DB_Type: 'postgres'
-        #   DB_Port: '5432'
-        #   REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
-
-def config(filename='database.ini', section='postgresql'):
+def config():
     
     print("dbhost = " + os.environ['DB_Host'])
 
@@ -41,7 +23,6 @@ def fetch(sql):
     print('fetch...')
     ttl = 10 # Time to live in seconds
     try:
-        params = config(section='redis')
         print('cache?...')
         cache = redis.Redis.from_url('redis://' + os.environ['REDIS_URL'] +':6379')
         result = cache.get(sql)
@@ -89,7 +70,6 @@ def connect():
 
 def lambda_handler(event, context):
     
-    # build()
     sql = 'SELECT slow_version();'
     db_result = fetch(sql)
     print('db_result:',db_result)
