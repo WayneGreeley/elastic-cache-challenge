@@ -247,6 +247,7 @@ Resources:
       Policies:
         - AmazonRDSFullAccess
         - AWSLambdaVPCAccessExecutionRole
+        - AmazonS3FullAccess # needed to report its status back to CloudFormation
       VpcConfig:
         SecurityGroupIds:
           - !GetAtt DBEC2SecurityGroup.GroupId
