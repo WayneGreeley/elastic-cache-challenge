@@ -156,6 +156,22 @@ Resources:
       Tags:
         - Key: Name
           Value: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
+          
+  RDSSecret:
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Description: "This is a Secrets Manager secret for an RDS instance with auto generated password"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: "\"@'/\\"
+  SecretRDSAttachment:
+    Type: "AWS::SecretsManager::SecretTargetAttachment"
+    Properties:
+      SecretId: !Ref RDSSecret
+      TargetId: !Ref WebAppDatabase
+      TargetType: AWS::RDS::DBInstance
 
   CacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -281,3 +297,14 @@ Outputs:
   HelloWRedisApi:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloredis"
+
+  SecretTestArn:
+    Description: "Testing Secret in CloudFormation Arn"
+    Value: !Ref RDSSecret
+  SecretTestUser:
+    Description: "Testing Secret in CloudFormation user"
+    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+  SecretTestPass:
+    Description: "Testing Secret in CloudFormation pass"
+    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
+
