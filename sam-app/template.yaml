@@ -101,7 +101,7 @@ Resources:
           def lambda_handler(event, context):
             try:
               ec = boto3.client('ec2')
-              response = ec.describe-internet-gateways(
+              response = ec.describe_internet_gateways(
                 Filters=[{
                   'Name': 'attachment.vpc-id',
                   'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
