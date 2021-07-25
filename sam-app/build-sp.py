@@ -1,6 +1,7 @@
 import psycopg2
 import os
 import cfnresponse
+import boto3
 
 def connect():
     # """ Connect to the PostgreSQL database server and return a cursor """
@@ -54,8 +55,19 @@ def lambda_handler(event, context):
         print('lambda_handler started...')
         db_result = build()
         print('... build complete!')
+        
+        string = "some-string"
+        encoded_string = string.encode("utf-8")
     
-        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+        bucket_name = "random-bucket-2021-07-25"
+        file_name = "hello.txt"
+        # lambda_path = "/tmp/" + file_name
+        s3_path = "/s3_path/" + file_name
+    
+        s3 = boto3.resource("s3")
+        s3.Bucket(bucket_name).put_object(Key=s3_path, Body=encoded_string)
+    
+        # cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
     except (Exception) as error:
         print(error)
-        cfnresponse.send(event, context, cfnresponse.FAILED, {})
+        # cfnresponse.send(event, context, cfnresponse.FAILED, {})

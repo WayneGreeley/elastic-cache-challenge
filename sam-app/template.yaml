@@ -277,10 +277,10 @@ Resources:
           DB_Type: 'postgres'
           DB_Port: '5432'
 
-  RunBuildProcedure:
-    Type: 'Custom::LambdaCallout'
-    Properties:
-      ServiceToken: !GetAtt BuildProcedureFunction.Arn
+  # RunBuildProcedure:
+  #   Type: 'Custom::LambdaCallout'
+  #   Properties:
+  #     ServiceToken: !GetAtt BuildProcedureFunction.Arn
 
 Outputs:
 
