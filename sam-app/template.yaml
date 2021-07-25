@@ -91,6 +91,32 @@ Resources:
       Timeout: '10'
       Role: !GetAtt EC2LambdaRole.Arn
 
+  GetDefaultIGFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          def lambda_handler(event, context):
+            try:
+              ec = boto3.client('ec2')
+              response = ec.describe-internet-gateways(
+                Filters=[{
+                  'Name': 'attachment.vpc-id',
+                  'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
+                },]
+              )
+              igId = response['InternetGateways'][0]['InternetGatewayId']
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"igId":igId})
+            except (Exception) as error:
+              print(error)
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.lambda_handler
+      Runtime: "python3.7"
+      Timeout: '10'
+      Role: !GetAtt EC2LambdaRole.Arn
+
   GetDefaultVpc:
     Type: 'Custom::LambdaCallout'
     Properties:
@@ -103,6 +129,14 @@ Resources:
     Type: 'Custom::LambdaCallout'
     Properties:
       ServiceToken: !GetAtt GetFirstSubnetFunction.Arn
+      Environment:
+        Variables:
+          vpcid: !GetAtt GetDefaultVpc.defaultId
+
+  GetDefaultIG:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt GetDefaultIGFunction.Arn
       Environment:
         Variables:
           vpcid: !GetAtt GetDefaultVpc.defaultId
