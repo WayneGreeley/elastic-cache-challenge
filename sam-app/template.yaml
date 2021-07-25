@@ -140,7 +140,33 @@ Resources:
       Environment:
         Variables:
           vpcid: !GetAtt GetDefaultVpc.defaultId
-
+          
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !GetAtt GetDefaultVpc.defaultId
+      InternetGatewayId: !GetAtt GetDefaultIG.igId
+  RouteTableForNATG:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !GetAtt GetDefaultVpc.defaultId
+  EIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+    DependsOn: VPCGatewayAttachment
+  NatGateway:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 'EIP.AllocationId'
+      SubnetId: !GetAtt GetFirstSubnet.subId
+  Route:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTableForNATG
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NatGateway
+      
   WebAppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
