@@ -59,7 +59,7 @@ def lambda_handler(event, context):
         string = "some-string"
         encoded_string = string.encode("utf-8")
     
-        bucket_name = "random-bucket-2021-07-25"
+        bucket_name = "random-bucket-2021-07-26"
         file_name = "hello.txt"
         # lambda_path = "/tmp/" + file_name
         s3_path = "/s3_path/" + file_name

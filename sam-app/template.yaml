@@ -171,7 +171,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Join [ '-', [ webapp-security-group, !Ref EnvironmentType ] ]
-      GroupDescription: 'Allow HTTP/HTTPS and SSH inbound and outbound traffic'
+      GroupDescription: 'Allow HTTP/HTTPS Postgres & Redis inbound and outbound traffic'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -182,8 +182,12 @@ Resources:
           ToPort: 443
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
           CidrIp: 0.0.0.0/0
 
   WebAppDatabase:
@@ -296,7 +300,7 @@ Resources:
         - AWSLambdaVPCAccessExecutionRole
       VpcConfig:
         SecurityGroupIds:
-          - !Ref WebAppSecurityGroup
+          - !GetAtt WebAppSecurityGroup.GroupId
         SubnetIds:
           - !GetAtt GetFirstSubnet.subId
       Events:
@@ -326,7 +330,7 @@ Resources:
         - AmazonS3FullAccess # needed to report its status back to CloudFormation
       VpcConfig:
         SecurityGroupIds:
-          - !GetAtt DBEC2SecurityGroup.GroupId
+          - !GetAtt WebAppSecurityGroup.GroupId
         SubnetIds:
           - !GetAtt GetFirstSubnet.subId
       Environment:
