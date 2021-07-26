@@ -296,7 +296,7 @@ Resources:
         - AWSLambdaVPCAccessExecutionRole
       VpcConfig:
         SecurityGroupIds:
-          - !Ref CacheSecurityGroup
+          - !Ref WebAppSecurityGroup
         SubnetIds:
           - !GetAtt GetFirstSubnet.subId
       Events:
