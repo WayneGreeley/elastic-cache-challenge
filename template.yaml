@@ -1,13 +1,11 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: create postgres database with CloudFormation
-
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
+Description: Sample SAM app to test postgres with redis
 
 Parameters:
   EnvironmentType: 
     Type: String
     Default: 'dev'
-
   DBInstanceIdentifier: 
     Type: String
     Default: 'webapp-db'
@@ -17,6 +15,10 @@ Parameters:
   DBPassword: 
     Type: String
     Default: 'postgres'
+
+Globals:
+  Function:
+    Timeout: 9
 
 Resources:
 
@@ -89,6 +91,32 @@ Resources:
       Timeout: '10'
       Role: !GetAtt EC2LambdaRole.Arn
 
+  GetDefaultIGFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          def lambda_handler(event, context):
+            try:
+              ec = boto3.client('ec2')
+              response = ec.describe_internet_gateways(
+                Filters=[{
+                  'Name': 'attachment.vpc-id',
+                  'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
+                },]
+              )
+              igId = response['InternetGateways'][0]['InternetGatewayId']
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"igId":igId})
+            except (Exception) as error:
+              print(error)
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.lambda_handler
+      Runtime: "python3.7"
+      Timeout: '10'
+      Role: !GetAtt EC2LambdaRole.Arn
+
   GetDefaultVpc:
     Type: 'Custom::LambdaCallout'
     Properties:
@@ -105,11 +133,45 @@ Resources:
         Variables:
           vpcid: !GetAtt GetDefaultVpc.defaultId
 
+  GetDefaultIG:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt GetDefaultIGFunction.Arn
+      Environment:
+        Variables:
+          vpcid: !GetAtt GetDefaultVpc.defaultId
+          
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !GetAtt GetDefaultVpc.defaultId
+      InternetGatewayId: !GetAtt GetDefaultIG.igId
+  RouteTableForNATG:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !GetAtt GetDefaultVpc.defaultId
+  EIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+    DependsOn: VPCGatewayAttachment
+  NatGateway:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 'EIP.AllocationId'
+      SubnetId: !GetAtt GetFirstSubnet.subId
+  Route:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTableForNATG
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NatGateway
+      
   WebAppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Join [ '-', [ webapp-security-group, !Ref EnvironmentType ] ]
-      GroupDescription: 'Allow HTTP/HTTPS and SSH inbound and outbound traffic'
+      GroupDescription: 'Allow HTTP/HTTPS Postgres & Redis inbound and outbound traffic'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -120,8 +182,12 @@ Resources:
           ToPort: 443
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
           CidrIp: 0.0.0.0/0
 
   WebAppDatabase:
@@ -154,6 +220,22 @@ Resources:
       Tags:
         - Key: Name
           Value: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
+          
+  RDSSecret:
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Description: "This is a Secrets Manager secret for an RDS instance with auto generated password"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: "\"@'/\\"
+  SecretRDSAttachment:
+    Type: "AWS::SecretsManager::SecretTargetAttachment"
+    Properties:
+      SecretId: !Ref RDSSecret
+      TargetId: !Ref WebAppDatabase
+      TargetType: AWS::RDS::DBInstance
 
   CacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -184,13 +266,109 @@ Resources:
       Description: cache
       SubnetIds:
       - !GetAtt GetFirstSubnet.subId
+      
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+      Events:
+        HelloWorld:
+          Type: Api 
+          Properties:
+            Path: /helloworld
+            Method: get
+      Environment:
+        Variables:
+          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+          DB_Username: !Ref DBUsername
+          DB_Password: !Ref DBPassword
+          DB_Type: 'postgres'
+          DB_Port: '5432'
+  HelloRedisFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: redis-app.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+        - AmazonElastiCacheFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt WebAppSecurityGroup.GroupId
+        SubnetIds:
+          - !GetAtt GetFirstSubnet.subId
+      Events:
+        HelloWorld:
+          Type: Api 
+          Properties:
+            Path: /helloredis
+            Method: get
+      Environment:
+        Variables:
+          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+          DB_Username: !Ref DBUsername
+          DB_Password: !Ref DBPassword
+          DB_Type: 'postgres'
+          DB_Port: '5432'
+          REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
+          
+  BuildProcedureFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: build-sp.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AmazonRDSFullAccess
+        - AWSLambdaVPCAccessExecutionRole
+        - AmazonS3FullAccess # needed to report its status back to CloudFormation
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt WebAppSecurityGroup.GroupId
+        SubnetIds:
+          - !GetAtt GetFirstSubnet.subId
+      Environment:
+        Variables:
+          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
+          DB_Username: !Ref DBUsername
+          DB_Password: !Ref DBPassword
+          DB_Type: 'postgres'
+          DB_Port: '5432'
+
+  # RunBuildProcedure:
+  #   Type: 'Custom::LambdaCallout'
+  #   Properties:
+  #     ServiceToken: !GetAtt BuildProcedureFunction.Arn
 
 Outputs:
 
   WebAppDatabaseEndpoint:
     Description: 'Connection endpoint for the database'
     Value: !GetAtt WebAppDatabase.Endpoint.Address
-
   RedisEndpoint:
     Description: 'Connection endpoint for the cache'
     Value: !GetAtt Cache.RedisEndpoint.Address
+
+  HelloWorldApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloworld"
+  HelloWRedisApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloredis"
+
+  SecretTestArn:
+    Description: "Testing Secret in CloudFormation Arn"
+    Value: !Ref RDSSecret
+  SecretTestUser:
+    Description: "Testing Secret in CloudFormation user"
+    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+  SecretTestPass:
+    Description: "Testing Secret in CloudFormation pass"
+    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
+
