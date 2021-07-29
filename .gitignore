@@ -2,4 +2,4 @@
 .aws-sam/
 
 # Ignore SAM deploy directions
-*/samconfig.toml
+samconfig.toml
