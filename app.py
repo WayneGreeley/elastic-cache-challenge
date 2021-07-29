@@ -3,10 +3,8 @@ import psycopg2
 import os
 
 def config():
-    
-    print("dbhost = " + os.environ['DB_Host'])
 
-    # get section, default to postgresql
+    # get postgresql connection settings
     db = {}
     db['host'] = os.environ['DB_Host']
     db['database'] = os.environ['DB_Type']
@@ -14,15 +12,12 @@ def config():
     db['password'] = os.environ['DB_Password']
     db['port'] = os.environ['DB_Port']
 
-    print('database configged')
-    print(db)
     return db
 
 
 def fetch(sql):
     print('fetch...')
     try:
-        # connect to database listed in database.ini
         conn = connect()
         cur = conn.cursor()
         cur.execute(sql)
@@ -70,6 +65,5 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps({
             "message": retval,
-            # "location": ip.text.replace("\n", "")
         }),
     }

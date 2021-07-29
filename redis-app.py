@@ -5,9 +5,7 @@ import os
 
 def config():
     
-    print("dbhost = " + os.environ['DB_Host'])
-
-    # get section, default to postgresql
+    # get postgresql connection settings
     db = {}
     db['host'] = os.environ['DB_Host']
     db['database'] = os.environ['DB_Type']
@@ -15,24 +13,21 @@ def config():
     db['password'] = os.environ['DB_Password']
     db['port'] = os.environ['DB_Port']
 
-    print('database configged')
-    print(db)
     return db
+
 
 def fetch(sql):
     print('fetch...')
     ttl = 10 # Time to live in seconds
     try:
-        print('cache?...')
         cache = redis.Redis.from_url('redis://' + os.environ['REDIS_URL'] +':6379')
         result = cache.get(sql)
-        print('cache found')
 
         if result:
             print('cache match ')
             return result.decode('utf-8')
         else:
-            # connect to database listed in database.ini
+            print('cache miss ')
             conn = connect()
             cur = conn.cursor()
             cur.execute(sql)
