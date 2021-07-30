@@ -3,12 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Sample SAM app to test postgres with redis
 
 Parameters:
-  EnvironmentType: 
-    Type: String
-    Default: 'dev'
-  DBInstanceIdentifier: 
-    Type: String
-    Default: 'webapp-db'
   DBUsername: 
     Type: String
     Default: 'postgres'
@@ -21,6 +15,7 @@ Globals:
     Timeout: 9
 
 Resources:
+  # ############################### VPC
   pubPrivateVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -142,7 +137,7 @@ Resources:
       ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
       VpcId: !Ref pubPrivateVPC
       
-  BuildProcedureFunction:
+  WriteS3Function:
     Type: AWS::Serverless::Function 
     Properties:
       CodeUri: .
@@ -158,11 +153,104 @@ Resources:
           - !Ref privateSubnet1
           - !Ref privateSubnet2
 
-  RunBuildProcedure:
+  RunWriteS3:
     Type: 'Custom::LambdaCallout'
     Properties:
-      ServiceToken: !GetAtt BuildProcedureFunction.Arn
+      ServiceToken: !GetAtt WriteS3Function.Arn
       
+      
+  # ############################### RDS
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: 'webapp-security-grp'
+      GroupDescription: 'Allow Postgres & Redis inbound and outbound traffic'
+      VpcId: !Ref pubPrivateVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+
+  # CacheSecurityGroup:
+  #   Type: 'AWS::EC2::SecurityGroup'
+  #   Properties:
+  #     GroupDescription: cache
+  #     VpcId: !GetAtt GetDefaultVpc.defaultId
+  # CacheSecurityGroupIngress:
+  #   Type: 'AWS::EC2::SecurityGroupIngress'
+  #   Properties:
+  #     GroupId: !Ref CacheSecurityGroup
+  #     IpProtocol: tcp
+  #     FromPort: 6379
+  #     ToPort: 6379
+  #     CidrIp: 0.0.0.0/0
+  WebAppDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: 'webapp-db'
+      VPCSecurityGroups:
+      - !GetAtt WebAppSecurityGroup.GroupId
+      AllocatedStorage: '5'
+      DBInstanceClass: db.t2.small
+      Engine: postgres
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      Tags:
+        - Key: Name
+          Value: 'webapp-rds'
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+
+
+  ############################### ElasticCache - Redis
+  CacheSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: cache
+      VpcId: !Ref pubPrivateVPC
+  CacheSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref CacheSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      CidrIp: 0.0.0.0/0
+  Cache:
+    Type: 'AWS::ElastiCache::CacheCluster'
+    Properties:
+      CacheNodeType: 'cache.t2.micro'
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      Engine: redis
+      EngineVersion: '3.2.4'
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+      - !GetAtt CacheSecurityGroup.GroupId
+  CacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      Description: cache
+      SubnetIds:
+          - !Ref privateSubnet1
+          - !Ref privateSubnet2
+
+
+
+
+
+
+
+
+
+
+
+
+
 Outputs:
   pubPrivateVPCID:
     Description: VPC ID
