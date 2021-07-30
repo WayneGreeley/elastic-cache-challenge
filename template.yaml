@@ -21,354 +21,172 @@ Globals:
     Timeout: 9
 
 Resources:
-
-  EC2LambdaRole:
-    Type: 'AWS::IAM::Role'
+  pubPrivateVPC:
+    Type: AWS::EC2::VPC
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-  GetDefaultVpcFunction:
-    Type: 'AWS::Lambda::Function'
+      CidrBlock: 172.31.0.0/16
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  publicSubnet1:
+    Type: AWS::EC2::Subnet
     Properties:
-      Code:
-        ZipFile: |
-          import boto3
-          import cfnresponse
-          def lambda_handler(event, context):
-            try:
-              ec = boto3.client('ec2')
-              response = ec.describe_vpcs(
-                Filters=[{
-                  'Name': 'isDefault',
-                  'Values': ['true',]
-                },]
-              )
-              defaultId = response['Vpcs'][0]['VpcId']
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"defaultId":defaultId})
-            except (Exception) as error:
-              print(error)
-              cfnresponse.send(event, context, cfnresponse.FAILED, {})
-      Handler: index.lambda_handler
-      Runtime: "python3.7"
-      Timeout: '10'
-      Role: !GetAtt EC2LambdaRole.Arn
-
-  GetFirstSubnetFunction:
-    Type: 'AWS::Lambda::Function'
+      VpcId: !Ref pubPrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+         - 0
+         - Fn::GetAZs: ""
+      CidrBlock: 172.31.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [!Ref "AWS::StackName","public-subnet"]]
+  privateSubnet1:
+    Type: AWS::EC2::Subnet
     Properties:
-      Code:
-        ZipFile: |
-          import boto3
-          import cfnresponse
-          def lambda_handler(event, context):
-            try:
-              ec = boto3.client('ec2')
-              response = ec.describe_subnets(
-                Filters=[{
-                  'Name': 'vpc-id',
-                  'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
-                },]
-              )
-              firstSubnet = response['Subnets'][0]
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"az":firstSubnet['AvailabilityZone'], "subId":firstSubnet['SubnetId']})
-            except (Exception) as error:
-              print(error)
-              cfnresponse.send(event, context, cfnresponse.FAILED, {})
-      Handler: index.lambda_handler
-      Runtime: "python3.7"
-      Timeout: '10'
-      Role: !GetAtt EC2LambdaRole.Arn
-
-  GetDefaultIGFunction:
-    Type: 'AWS::Lambda::Function'
+      VpcId: !Ref pubPrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+         - 0
+         - Fn::GetAZs: ""
+      CidrBlock: 172.31.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [!Ref "AWS::StackName","private-subnet-a"]]
+  privateSubnet2:
+    Type: AWS::EC2::Subnet
     Properties:
-      Code:
-        ZipFile: |
-          import boto3
-          import cfnresponse
-          def lambda_handler(event, context):
-            try:
-              ec = boto3.client('ec2')
-              response = ec.describe_internet_gateways(
-                Filters=[{
-                  'Name': 'attachment.vpc-id',
-                  'Values': [event['ResourceProperties']['Environment']['Variables']['vpcid'],]
-                },]
-              )
-              igId = response['InternetGateways'][0]['InternetGatewayId']
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, {"igId":igId})
-            except (Exception) as error:
-              print(error)
-              cfnresponse.send(event, context, cfnresponse.FAILED, {})
-      Handler: index.lambda_handler
-      Runtime: "python3.7"
-      Timeout: '10'
-      Role: !GetAtt EC2LambdaRole.Arn
-
-  GetDefaultVpc:
-    Type: 'Custom::LambdaCallout'
+      VpcId: !Ref pubPrivateVPC
+      AvailabilityZone:
+        Fn::Select:
+         - 1
+         - Fn::GetAZs: ""
+      CidrBlock: 172.31.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [!Ref "AWS::StackName","private-subnet-b"]]
+  internetGateway:
+    Type: AWS::EC2::InternetGateway
     Properties:
-      ServiceToken: !GetAtt GetDefaultVpcFunction.Arn
-      Environment:
-        Variables:
-          Region: !Ref "AWS::Region"
-
-  GetFirstSubnet:
-    Type: 'Custom::LambdaCallout'
-    Properties:
-      ServiceToken: !GetAtt GetFirstSubnetFunction.Arn
-      Environment:
-        Variables:
-          vpcid: !GetAtt GetDefaultVpc.defaultId
-
-  GetDefaultIG:
-    Type: 'Custom::LambdaCallout'
-    Properties:
-      ServiceToken: !GetAtt GetDefaultIGFunction.Arn
-      Environment:
-        Variables:
-          vpcid: !GetAtt GetDefaultVpc.defaultId
-          
-  VPCGatewayAttachment:
+      Tags:
+        - Key: Name
+          Value: !Join ["-", [!Ref "AWS::StackName","gateway"]]
+  gatewayToInternet:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !GetAtt GetDefaultVpc.defaultId
-      InternetGatewayId: !GetAtt GetDefaultIG.igId
-  RouteTableForNATG:
+      VpcId: !Ref pubPrivateVPC
+      InternetGatewayId: !Ref internetGateway
+  publicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !GetAtt GetDefaultVpc.defaultId
-  EIP:
-    Type: 'AWS::EC2::EIP'
+      VpcId: !Ref pubPrivateVPC
+  publicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: gatewayToInternet
+    Properties:
+      RouteTableId: !Ref publicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref internetGateway
+  publicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref publicSubnet1
+      RouteTableId: !Ref publicRouteTable
+  natGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: natPublicIP
+    Properties:
+      AllocationId: !GetAtt natPublicIP.AllocationId
+      SubnetId: !Ref publicSubnet1
+  natPublicIP:
+    Type: AWS::EC2::EIP
+    DependsOn: pubPrivateVPC
     Properties:
       Domain: vpc
-    DependsOn: VPCGatewayAttachment
-  NatGateway:
-    Type: 'AWS::EC2::NatGateway'
+  privateRouteTable:
+    Type: AWS::EC2::RouteTable
     Properties:
-      AllocationId: !GetAtt 'EIP.AllocationId'
-      SubnetId: !GetAtt GetFirstSubnet.subId
-  Route:
-    Type: 'AWS::EC2::Route'
+      VpcId: !Ref pubPrivateVPC
+  privateRoute:
+    Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref RouteTableForNATG
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGateway
+      RouteTableId: !Ref privateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref natGateway
+  privateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref privateSubnet1
+      RouteTableId: !Ref privateRouteTable
+  privateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref privateSubnet2
+      RouteTableId: !Ref privateRouteTable
+  s3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: "*"
+          Action:
+            - "s3:*"
+          Resource:
+            - "*"
+      RouteTableIds:
+        - !Ref privateRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref pubPrivateVPC
       
-  WebAppSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Join [ '-', [ webapp-security-group, !Ref EnvironmentType ] ]
-      GroupDescription: 'Allow HTTP/HTTPS Postgres & Redis inbound and outbound traffic'
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 6379
-          ToPort: 6379
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          CidrIp: 0.0.0.0/0
-
-  WebAppDatabase:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBInstanceIdentifier: !Ref DBInstanceIdentifier
-      VPCSecurityGroups:
-      - !GetAtt DBEC2SecurityGroup.GroupId
-      AllocatedStorage: '5'
-      DBInstanceClass: db.t2.small
-      Engine: postgres
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
-      Tags:
-        - Key: Name
-          Value: !Join [ '-', [ webapp-rds, !Ref EnvironmentType ] ]
-    DeletionPolicy: Snapshot
-    UpdateReplacePolicy: Snapshot
-
-  DBEC2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
-      GroupDescription: Allow postgres inbound traffic
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 5432
-        ToPort: 5432
-        CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
-          
-  RDSSecret:
-    Type: "AWS::SecretsManager::Secret"
-    Properties:
-      Description: "This is a Secrets Manager secret for an RDS instance with auto generated password"
-      GenerateSecretString:
-        SecretStringTemplate: '{"username": "admin"}'
-        GenerateStringKey: "password"
-        PasswordLength: 16
-        ExcludeCharacters: "\"@'/\\"
-  SecretRDSAttachment:
-    Type: "AWS::SecretsManager::SecretTargetAttachment"
-    Properties:
-      SecretId: !Ref RDSSecret
-      TargetId: !Ref WebAppDatabase
-      TargetType: AWS::RDS::DBInstance
-
-  CacheSecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: cache
-      VpcId: !GetAtt GetDefaultVpc.defaultId
-  CacheSecurityGroupIngress:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Properties:
-      GroupId: !Ref CacheSecurityGroup
-      IpProtocol: tcp
-      FromPort: 6379
-      ToPort: 6379
-      CidrIp: 0.0.0.0/0
-  Cache:
-    Type: 'AWS::ElastiCache::CacheCluster'
-    Properties:
-      CacheNodeType: 'cache.t2.micro'
-      CacheSubnetGroupName: !Ref CacheSubnetGroup
-      Engine: redis
-      EngineVersion: '3.2.4'
-      NumCacheNodes: 1
-      VpcSecurityGroupIds:
-      - !Ref CacheSecurityGroup
-  CacheSubnetGroup:
-    Type: 'AWS::ElastiCache::SubnetGroup'
-    Properties:
-      Description: cache
-      SubnetIds:
-      - !GetAtt GetFirstSubnet.subId
-      
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function 
-    Properties:
-      CodeUri: .
-      Handler: app.lambda_handler
-      Runtime: python3.7
-      Policies:
-        - AmazonRDSFullAccess
-      Events:
-        HelloWorld:
-          Type: Api 
-          Properties:
-            Path: /helloworld
-            Method: get
-      Environment:
-        Variables:
-          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
-          DB_Type: 'postgres'
-          DB_Port: '5432'
-  HelloRedisFunction:
-    Type: AWS::Serverless::Function 
-    Properties:
-      CodeUri: .
-      Handler: redis-app.lambda_handler
-      Runtime: python3.7
-      Policies:
-        - AmazonRDSFullAccess
-        - AmazonElastiCacheFullAccess
-        - AWSLambdaVPCAccessExecutionRole
-      VpcConfig:
-        SecurityGroupIds:
-          - !GetAtt WebAppSecurityGroup.GroupId
-        SubnetIds:
-          - !GetAtt GetFirstSubnet.subId
-      Events:
-        HelloWorld:
-          Type: Api 
-          Properties:
-            Path: /helloredis
-            Method: get
-      Environment:
-        Variables:
-          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
-          DB_Type: 'postgres'
-          DB_Port: '5432'
-          REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
-          
   BuildProcedureFunction:
     Type: AWS::Serverless::Function 
     Properties:
       CodeUri: .
-      Handler: build-sp.lambda_handler
+      Handler: write-s3.lambda_handler
       Runtime: python3.7
       Policies:
-        - AmazonRDSFullAccess
         - AWSLambdaVPCAccessExecutionRole
         - AmazonS3FullAccess # needed to report its status back to CloudFormation
       VpcConfig:
         SecurityGroupIds:
-          - !GetAtt WebAppSecurityGroup.GroupId
+          - !GetAtt pubPrivateVPC.DefaultSecurityGroup
         SubnetIds:
-          - !GetAtt GetFirstSubnet.subId
-      Environment:
-        Variables:
-          DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
-          DB_Type: 'postgres'
-          DB_Port: '5432'
+          - !Ref privateSubnet1
+          - !Ref privateSubnet2
 
-  # RunBuildProcedure:
-  #   Type: 'Custom::LambdaCallout'
-  #   Properties:
-  #     ServiceToken: !GetAtt BuildProcedureFunction.Arn
-
+  RunBuildProcedure:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt BuildProcedureFunction.Arn
+      
 Outputs:
-
-  WebAppDatabaseEndpoint:
-    Description: 'Connection endpoint for the database'
-    Value: !GetAtt WebAppDatabase.Endpoint.Address
-  RedisEndpoint:
-    Description: 'Connection endpoint for the cache'
-    Value: !GetAtt Cache.RedisEndpoint.Address
-
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloworld"
-  HelloWRedisApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/helloredis"
-
-  SecretTestArn:
-    Description: "Testing Secret in CloudFormation Arn"
-    Value: !Ref RDSSecret
-  SecretTestUser:
-    Description: "Testing Secret in CloudFormation user"
-    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
-  SecretTestPass:
-    Description: "Testing Secret in CloudFormation pass"
-    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
+  pubPrivateVPCID:
+    Description: VPC ID
+    Value: !Ref pubPrivateVPC
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName","vpc"]]
+  publicSubnet1ID:
+    Description: Public Subnet A ID
+    Value: !Ref publicSubnet1
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName","public-subnet-a"]]
+  privateSubnet1ID:
+    Description: Private Subnet A ID
+    Value: !Ref privateSubnet1
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName","private-subnet-a"]]
+  privateSubnet2ID:
+    Description: Private Subnet B ID
+    Value: !Ref privateSubnet2
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName","private-subnet-b"]]
+  privateVPCSecurityGroup:
+    Description: Default security for Lambda VPC
+    Value: !GetAtt pubPrivateVPC.DefaultSecurityGroup
+    Export:
+      Name: !Join ["-", [!Ref "AWS::StackName","vpc-sg"]]
 
