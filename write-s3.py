@@ -9,7 +9,7 @@ def lambda_handler(event, context):
         string = "some-string"
         encoded_string = string.encode("utf-8")
     
-        bucket_name = "lambda-artifacts-bef726211f8f0d84"
+        bucket_name = "lambda-artifacts-87f73c20233d9ee7"
         file_name = "hello.txt"
         s3_path = "s3_path/" + file_name
     

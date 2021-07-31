@@ -43,7 +43,8 @@ def build():
         cur.execute(sqlCommand)
         print('Closing connection to build database...')
         cur.close() 
-        conn.close()
+        # conn.close()
+        conn.commit()
     
         return 0
         
