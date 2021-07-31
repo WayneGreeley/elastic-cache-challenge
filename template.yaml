@@ -190,11 +190,11 @@ Resources:
       DestinationCidrBlock: '0.0.0.0/0'
       NatGatewayId: !Ref NatGateway
       
-  # SubnetRouteTableAssociation:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     SubnetId: !GetAtt GetFirstSubnet.subId
-  #     RouteTableId: !Ref RouteTableForNATG
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref privateSubnet1
+      RouteTableId: !Ref RouteTableForNATG
       
   s3Endpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -376,9 +376,9 @@ Resources:
         - AmazonS3FullAccess # needed to report its status back to CloudFormation
       VpcConfig:
         SecurityGroupIds:
-          - !GetAtt WebAppSecurityGroup.GroupId
+          - !GetAtt OpenSecurityGroup.GroupId
         SubnetIds:
-          - !GetAtt GetFirstSubnet.subId
+          - !Ref privateSubnet1
       Environment:
         Variables:
           DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
@@ -387,10 +387,10 @@ Resources:
           DB_Type: 'postgres'
           DB_Port: '5432'
 
-  # RunBuildProcedure:
-  #   Type: 'Custom::LambdaCallout'
-  #   Properties:
-  #     ServiceToken: !GetAtt BuildProcedureFunction.Arn
+  RunBuildProcedure:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt BuildProcedureFunction.Arn
       
   WriteS3Function:
     Type: AWS::Serverless::Function 
@@ -405,7 +405,7 @@ Resources:
         SecurityGroupIds:
           - !GetAtt OpenSecurityGroup.GroupId
         SubnetIds:
-          - !GetAtt GetFirstSubnet.subId
+          - !Ref privateSubnet1
 
 Outputs:
 

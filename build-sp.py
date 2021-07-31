@@ -57,17 +57,17 @@ def lambda_handler(event, context):
         db_result = build()
         print('... build complete!')
         
-        # string = "some-string"
-        # encoded_string = string.encode("utf-8")
+        string = "some-string"
+        encoded_string = string.encode("utf-8")
     
-        # bucket_name = "random-bucket-2021-07-26"
-        # file_name = "hello.txt"
-        # s3_path = "/s3_path/" + file_name
+        bucket_name = "lambda-artifacts-09b3d9a4f632831f"
+        file_name = "build.txt"
+        s3_path = "s3_path/" + file_name
     
-        # s3 = boto3.resource("s3")
+        s3 = boto3.resource("s3")
         # s3.Bucket(bucket_name).put_object(Key=s3_path, Body=encoded_string)
     
-        # cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
     except (Exception) as error:
         print(error)
-        # cfnresponse.send(event, context, cfnresponse.FAILED, {})
+        cfnresponse.send(event, context, cfnresponse.FAILED, {})
