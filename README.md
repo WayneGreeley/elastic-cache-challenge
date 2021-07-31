@@ -20,6 +20,7 @@ sam build
 sam deploy -g
 ```
 
+<!---
 I really wanted to have a Lambda function create the SQL function for me during the stack create process.
 However, that means the Lambda function needs access to the VPC and the internet, which is a tougher task than I realized...I will figure it out someday.
 So, to add the SQL function in the meanwhile...
@@ -47,11 +48,11 @@ create function slow_version() RETURNS text AS
             LANGUAGE SQL;
 ```
 
-
+--->
 
 
 Test the application using the outputs from the SAM deploy.
-I like to use the Postman application as it provides and easy way to store tests that you run often.
+I like to use the Postman application as it provides an easy way to store tests that you run often.
 When you test the helloworld endpoint, the response is always greater than five seconds.
 The cache time-to-live for redis is set to 10 secounds, so the first helloredis test will take over five seconds.
 For the next ten seconds, the helloredis test will take under a second.
