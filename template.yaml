@@ -245,8 +245,8 @@ Resources:
       AllocatedStorage: '5'
       DBInstanceClass: db.t2.small
       Engine: postgres
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
+      MasterUsername: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
       Tags:
         - Key: Name
           Value: 'webapp-rds'
@@ -330,8 +330,8 @@ Resources:
       Environment:
         Variables:
           DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
+          DB_Username: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+          DB_Password: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
           DB_Type: 'postgres'
           DB_Port: '5432'
   HelloRedisFunction:
@@ -358,8 +358,8 @@ Resources:
       Environment:
         Variables:
           DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
+          DB_Username: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+          DB_Password: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
           DB_Type: 'postgres'
           DB_Port: '5432'
           REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
@@ -382,8 +382,8 @@ Resources:
       Environment:
         Variables:
           DB_Host: !GetAtt WebAppDatabase.Endpoint.Address
-          DB_Username: !Ref DBUsername
-          DB_Password: !Ref DBPassword
+          DB_Username: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
+          DB_Password: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
           DB_Type: 'postgres'
           DB_Port: '5432'
 
@@ -426,10 +426,4 @@ Outputs:
   SecretTestArn:
     Description: "Testing Secret in CloudFormation Arn"
     Value: !Ref RDSSecret
-  SecretTestUser:
-    Description: "Testing Secret in CloudFormation user"
-    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::username}}'
-  SecretTestPass:
-    Description: "Testing Secret in CloudFormation pass"
-    Value: !Sub '{{resolve:secretsmanager:${RDSSecret}::password}}'
 
