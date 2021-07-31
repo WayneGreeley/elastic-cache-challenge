@@ -3,12 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Sample SAM app to test postgres with redis
 
 Parameters:
-  EnvironmentType: 
-    Type: String
-    Default: 'dev'
-  DBInstanceIdentifier: 
-    Type: String
-    Default: 'webapp-db'
   DBUsername: 
     Type: String
     Default: 'postgres'
@@ -167,10 +161,33 @@ Resources:
       DestinationCidrBlock: '0.0.0.0/0'
       NatGatewayId: !Ref NatGateway
       
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !GetAtt GetFirstSubnet.subId
+      RouteTableId: !Ref RouteTableForNATG
+      
+  s3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: "*"
+          Action:
+            - "s3:*"
+          Resource:
+            - "*"
+      RouteTableIds:
+        - !Ref RouteTableForNATG
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !GetAtt GetDefaultVpc.defaultId
+      
   WebAppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Join [ '-', [ webapp-security-group, !Ref EnvironmentType ] ]
+      GroupName: 'webapp-security-group'
       GroupDescription: 'Allow HTTP/HTTPS Postgres & Redis inbound and outbound traffic'
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -193,9 +210,9 @@ Resources:
   WebAppDatabase:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      DBInstanceIdentifier: 'postgres'
       VPCSecurityGroups:
-      - !GetAtt DBEC2SecurityGroup.GroupId
+      - !GetAtt DBSecurityGroup.GroupId
       AllocatedStorage: '5'
       DBInstanceClass: db.t2.small
       Engine: postgres
@@ -203,14 +220,14 @@ Resources:
       MasterUserPassword: !Ref DBPassword
       Tags:
         - Key: Name
-          Value: !Join [ '-', [ webapp-rds, !Ref EnvironmentType ] ]
+          Value: 'webapp-rds'
     DeletionPolicy: Snapshot
     UpdateReplacePolicy: Snapshot
 
-  DBEC2SecurityGroup:
+  DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
+      GroupName: 'webapp-db-security-group'
       GroupDescription: Allow postgres inbound traffic
       SecurityGroupIngress:
       - IpProtocol: tcp
@@ -219,7 +236,7 @@ Resources:
         CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Join [ '-', [ webapp-db-security-group, !Ref EnvironmentType ] ]
+          Value: 'webapp-db-security-group'
           
   RDSSecret:
     Type: "AWS::SecretsManager::Secret"
@@ -345,6 +362,21 @@ Resources:
   #   Type: 'Custom::LambdaCallout'
   #   Properties:
   #     ServiceToken: !GetAtt BuildProcedureFunction.Arn
+      
+  WriteS3Function:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: .
+      Handler: write-s3.lambda_handler
+      Runtime: python3.7
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AmazonS3FullAccess
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt WebAppSecurityGroup.GroupId
+        SubnetIds:
+          - !GetAtt GetFirstSubnet.subId
 
 Outputs:
 
