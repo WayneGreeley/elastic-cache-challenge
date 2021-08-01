@@ -11,6 +11,7 @@ It would have been much simplier if I had created a complete VPC from scratch, b
 If you want to try this out, clone this repo into your favorite IDE.
 I use AWS Cloud9 to make it easier to run AWS commands from the terminal while editing code.
 I also use an AWS sandbox account, so each time I start working on a project, the account is empty except for the default VPC.
+The entire application is deployed in one SAM template file.
 
 ```
 git clone https://github.com/WayneGreeley/elastic-cache-challenge.git
@@ -70,7 +71,7 @@ For the next ten seconds, the helloredis test will take under a second.
 There is room for improvement.
 I could create a VPC from scratch to eliminate a few of the look ups.
 The security needs major review for a real AWS account.
-I could store the sensitive data in Secrets Manager.
+I didn't use Secrets Manager properly, but I have run out of time.
 
 
 

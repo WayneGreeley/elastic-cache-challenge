@@ -2,20 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Sample SAM app to test postgres with redis
 
-Parameters:
-  DBUsername: 
-    Type: String
-    Default: 'postgres'
-  DBPassword: 
-    Type: String
-    Default: 'postgres'
-
 Globals:
   Function:
     Timeout: 9
 
 Resources:
 
+  ############################### Lambda role to retrieve Default VPC info
   EC2LambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -33,6 +26,7 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
+  ############################### Crazy Lambda function to retrieve Default VPC info
   GetDefaultVpcFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -135,7 +129,6 @@ Resources:
         Variables:
           vpcid: !GetAtt GetDefaultVpc.defaultId
           
-          
   privateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -236,6 +229,7 @@ Resources:
           ToPort: 5432
           CidrIp: 0.0.0.0/0
 
+  ############################### RDS Postgres database
   WebAppDatabase:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -272,7 +266,7 @@ Resources:
     Properties:
       Description: "This is a Secrets Manager secret for an RDS instance with auto generated password"
       GenerateSecretString:
-        SecretStringTemplate: '{"username": "admin"}'
+        SecretStringTemplate: '{"username": "myadmin"}'
         GenerateStringKey: "password"
         PasswordLength: 16
         ExcludeCharacters: "\"@'/\\"
@@ -283,6 +277,7 @@ Resources:
       TargetId: !Ref WebAppDatabase
       TargetType: AWS::RDS::DBInstance
 
+  ############################### ElasticCache - Redis
   CacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -313,6 +308,7 @@ Resources:
       SubnetIds:
       - !GetAtt GetFirstSubnet.subId
       
+  ############################### Lambda/API Application
   HelloWorldFunction:
     Type: AWS::Serverless::Function 
     Properties:
@@ -364,6 +360,7 @@ Resources:
           DB_Port: '5432'
           REDIS_URL: !GetAtt Cache.RedisEndpoint.Address
           
+  ############################### Lambda function to create sql function during stack creation
   BuildProcedureFunction:
     Type: AWS::Serverless::Function 
     Properties:
@@ -392,20 +389,6 @@ Resources:
     Properties:
       ServiceToken: !GetAtt BuildProcedureFunction.Arn
       
-  WriteS3Function:
-    Type: AWS::Serverless::Function 
-    Properties:
-      CodeUri: .
-      Handler: write-s3.lambda_handler
-      Runtime: python3.7
-      Policies:
-        - AWSLambdaVPCAccessExecutionRole
-        - AmazonS3FullAccess
-      VpcConfig:
-        SecurityGroupIds:
-          - !GetAtt OpenSecurityGroup.GroupId
-        SubnetIds:
-          - !Ref privateSubnet1
 
 Outputs:
 

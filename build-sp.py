@@ -43,8 +43,8 @@ def build():
         cur.execute(sqlCommand)
         print('Closing connection to build database...')
         cur.close() 
-        # conn.close()
         conn.commit()
+        # conn.close() # Do I still need to close after a commit?
     
         return 0
         
@@ -64,7 +64,8 @@ def lambda_handler(event, context):
         file_name = "build.txt"
         s3_path = "s3_path/" + file_name
     
-        s3 = boto3.resource("s3")
+        s3 = boto3.resource("s3") 
+        # S3 access test code
         # s3.Bucket(bucket_name).put_object(Key=s3_path, Body=encoded_string)
     
         cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
